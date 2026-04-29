@@ -1,40 +1,27 @@
 from fpdf import FPDF
 import os
+import re
 from datetime import datetime
+
+def safe_text(text):
+    """将文本中的非ASCII字符转换为拼音或删除"""
+    if text is None:
+        return ""
+    # 只保留 ASCII 字符（字母、数字、基本符号）
+    safe = re.sub(r'[^\x00-\x7F]+', ' ', str(text))
+    # 合并多个空格
+    safe = re.sub(r'\s+', ' ', safe)
+    return safe.strip()
 
 def generate_evaluation_report(filename, project_name, project_type, project_scale,
                                security_level, total_score, scores, alerts, risks,
                                extracted_budget, text_length):
-    """生成PDF评价报告 - 云端兼容版"""
+    """生成PDF评价报告 - 纯英文/ASCII 版本"""
     
     pdf = FPDF()
     pdf.add_page()
     pdf.set_auto_page_break(auto=True, margin=15)
-    
-    # 尝试加载中文字体（Linux 环境）
-    font_loaded = False
-    
-    # Linux 常见中文字体路径
-    linux_fonts = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
-        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    ]
-    
-    for font_path in linux_fonts:
-        if os.path.exists(font_path):
-            try:
-                pdf.add_font('Chinese', '', font_path)
-                font_loaded = True
-                break
-            except:
-                continue
-    
-    if font_loaded:
-        pdf.set_font('Chinese', '', 12)
-    else:
-        pdf.set_font('Helvetica', '', 10)
+    pdf.set_font('Helvetica', '', 10)
     
     # 标题
     pdf.set_font_size(16)
@@ -48,20 +35,22 @@ def generate_evaluation_report(filename, project_name, project_type, project_sca
     pdf.set_text_color(0, 0, 0)
     pdf.ln(5)
     
-    # 项目基本信息（使用拼音或英文）
+    # 项目基本信息
     pdf.set_font_size(14)
     pdf.cell(0, 8, "1. Project Information", 0, 1)
     pdf.set_font_size(10)
-    pdf.cell(0, 6, f"Project Name: {project_name}", 0, 1)
-    pdf.cell(0, 6, f"Project Type: {project_type}", 0, 1)
-    pdf.cell(0, 6, f"Project Scale: {project_scale}", 0, 1)
-    pdf.cell(0, 6, f"Security Level: {security_level}", 0, 1)
-    pdf.cell(0, 6, f"Extracted Budget: {extracted_budget} (10K RMB)" if extracted_budget else "Extracted Budget: Not detected", 0, 1)
+    pdf.cell(0, 6, f"Project Name: {safe_text(project_name)}", 0, 1)
+    pdf.cell(0, 6, f"Project Type: {safe_text(project_type)}", 0, 1)
+    pdf.cell(0, 6, f"Project Scale: {safe_text(project_scale)}", 0, 1)
+    pdf.cell(0, 6, f"Security Level: {safe_text(security_level)}", 0, 1)
+    
+    budget_text = f"Extracted Budget: {extracted_budget} (10K RMB)" if extracted_budget else "Extracted Budget: Not detected"
+    pdf.cell(0, 6, budget_text, 0, 1)
     pdf.cell(0, 6, f"Text Length: {text_length} characters", 0, 1)
     pdf.cell(0, 6, f"Total Score: {total_score:.2f}", 0, 1)
     pdf.ln(5)
     
-    # 各维度得分（使用英文）
+    # 各维度得分
     pdf.set_font_size(14)
     pdf.cell(0, 8, "2. Dimension Scores", 0, 1)
     pdf.set_font_size(10)
@@ -77,9 +66,9 @@ def generate_evaluation_report(filename, project_name, project_type, project_sca
     }
     
     for indicator, data in scores.items():
-        en_name = name_map.get(indicator, indicator)
+        en_name = name_map.get(indicator, safe_text(indicator))
         score = data["得分"]
-        detail = data["说明"][:80]
+        detail = safe_text(data["说明"])[:80]
         
         pdf.set_font_size(11)
         pdf.cell(0, 6, f"{en_name}: {score:.2f}", 0, 1)
@@ -100,7 +89,7 @@ def generate_evaluation_report(filename, project_name, project_type, project_sca
             pdf.set_text_color(200, 0, 0)
             pdf.cell(5, 6, "-", 0, 0)
             pdf.set_text_color(0, 0, 0)
-            short_risk = risk[:100] if len(risk) > 100 else risk
+            short_risk = safe_text(risk)[:100]
             pdf.cell(0, 6, f" {short_risk}", 0, 1)
         pdf.ln(3)
     
@@ -111,7 +100,7 @@ def generate_evaluation_report(filename, project_name, project_type, project_sca
         pdf.set_font_size(10)
         for alert in alerts[:5]:
             pdf.cell(5, 6, "-", 0, 0)
-            short_alert = alert[:100] if len(alert) > 100 else alert
+            short_alert = safe_text(alert)[:100]
             pdf.cell(0, 6, f" {short_alert}", 0, 1)
         pdf.ln(3)
     
