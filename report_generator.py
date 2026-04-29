@@ -5,24 +5,24 @@ from datetime import datetime
 def generate_evaluation_report(filename, project_name, project_type, project_scale,
                                security_level, total_score, scores, alerts, risks,
                                extracted_budget, text_length):
-    """生成PDF评价报告 - 超简化版"""
+    """生成PDF评价报告 - 云端兼容版"""
     
-    # 创建PDF
     pdf = FPDF()
     pdf.add_page()
-    
-    # 设置自动分页
     pdf.set_auto_page_break(auto=True, margin=15)
     
-    # 尝试加载中文字体
+    # 尝试加载中文字体（Linux 环境）
     font_loaded = False
-    font_paths = [
-        "C:/Windows/Fonts/simhei.ttf",
-        "C:/Windows/Fonts/simsun.ttc",
-        "C:/Windows/Fonts/msyh.ttc",
+    
+    # Linux 常见中文字体路径
+    linux_fonts = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
     ]
     
-    for font_path in font_paths:
+    for font_path in linux_fonts:
         if os.path.exists(font_path):
             try:
                 pdf.add_font('Chinese', '', font_path)
@@ -31,108 +31,110 @@ def generate_evaluation_report(filename, project_name, project_type, project_sca
             except:
                 continue
     
-    # 设置字体
     if font_loaded:
-        pdf.set_font('Chinese', '', 11)
+        pdf.set_font('Chinese', '', 12)
     else:
         pdf.set_font('Helvetica', '', 10)
     
-    # ========== 标题 ==========
+    # 标题
     pdf.set_font_size(16)
-    pdf.cell(0, 10, "政府信息化项目方案智能评价报告", 0, 1, 'C')
+    pdf.cell(0, 10, "Government Project Evaluation Report", 0, 1, 'C')
     pdf.ln(5)
     
-    # ========== 生成时间 ==========
+    # 生成时间
     pdf.set_font_size(9)
     pdf.set_text_color(128, 128, 128)
-    pdf.cell(0, 6, f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 0, 1)
+    pdf.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", 0, 1)
     pdf.set_text_color(0, 0, 0)
     pdf.ln(5)
     
-    # ========== 一、项目基本信息 ==========
+    # 项目基本信息（使用拼音或英文）
     pdf.set_font_size(14)
-    pdf.cell(0, 8, "一、项目基本信息", 0, 1)
+    pdf.cell(0, 8, "1. Project Information", 0, 1)
     pdf.set_font_size(10)
-    pdf.cell(0, 6, f"项目名称：{project_name}", 0, 1)
-    pdf.cell(0, 6, f"项目类型：{project_type}", 0, 1)
-    pdf.cell(0, 6, f"项目规模：{project_scale}", 0, 1)
-    pdf.cell(0, 6, f"安全等级：{security_level}", 0, 1)
-    pdf.cell(0, 6, f"提取预算：{extracted_budget}万元" if extracted_budget else "提取预算：未检测", 0, 1)
-    pdf.cell(0, 6, f"方案字数：{text_length}字", 0, 1)
-    pdf.cell(0, 6, f"加权总分：{total_score:.2f}", 0, 1)
+    pdf.cell(0, 6, f"Project Name: {project_name}", 0, 1)
+    pdf.cell(0, 6, f"Project Type: {project_type}", 0, 1)
+    pdf.cell(0, 6, f"Project Scale: {project_scale}", 0, 1)
+    pdf.cell(0, 6, f"Security Level: {security_level}", 0, 1)
+    pdf.cell(0, 6, f"Extracted Budget: {extracted_budget} (10K RMB)" if extracted_budget else "Extracted Budget: Not detected", 0, 1)
+    pdf.cell(0, 6, f"Text Length: {text_length} characters", 0, 1)
+    pdf.cell(0, 6, f"Total Score: {total_score:.2f}", 0, 1)
     pdf.ln(5)
     
-    # ========== 二、各维度得分 ==========
+    # 各维度得分（使用英文）
     pdf.set_font_size(14)
-    pdf.cell(0, 8, "二、各维度得分详情", 0, 1)
+    pdf.cell(0, 8, "2. Dimension Scores", 0, 1)
     pdf.set_font_size(10)
     
+    # 中英文映射
+    name_map = {
+        "技术先进性": "Technical Advanced",
+        "内容丰富度": "Content Richness", 
+        "预算合理性": "Budget Reasonableness",
+        "安全可靠性": "Security & Reliability",
+        "与优秀方案相似度": "Similarity to Excellent",
+        "项目可行性": "Project Feasibility"
+    }
+    
     for indicator, data in scores.items():
+        en_name = name_map.get(indicator, indicator)
         score = data["得分"]
-        detail = data["说明"]
+        detail = data["说明"][:80]
         
         pdf.set_font_size(11)
-        pdf.cell(0, 6, f"{indicator}：{score:.2f}", 0, 1)
-        
+        pdf.cell(0, 6, f"{en_name}: {score:.2f}", 0, 1)
         pdf.set_font_size(9)
         pdf.set_text_color(100, 100, 100)
-        # 处理长文本
-        if len(detail) > 80:
-            detail = detail[:80] + "..."
         pdf.cell(0, 5, f"  {detail}", 0, 1)
         pdf.set_text_color(0, 0, 0)
         pdf.ln(2)
     
     pdf.ln(3)
     
-    # ========== 三、风险扫描 ==========
+    # 风险提示
     if risks:
         pdf.set_font_size(14)
-        pdf.cell(0, 8, "三、风险扫描结果", 0, 1)
+        pdf.cell(0, 8, "3. Risk Alerts", 0, 1)
         pdf.set_font_size(10)
-        
-        for risk in risks:
+        for risk in risks[:5]:
             pdf.set_text_color(200, 0, 0)
             pdf.cell(5, 6, "-", 0, 0)
             pdf.set_text_color(0, 0, 0)
-            # 限制长度
-            short_risk = risk[:150] if len(risk) > 150 else risk
+            short_risk = risk[:100] if len(risk) > 100 else risk
             pdf.cell(0, 6, f" {short_risk}", 0, 1)
         pdf.ln(3)
     
-    # ========== 四、改进建议 ==========
+    # 改进建议
     if alerts:
         pdf.set_font_size(14)
-        pdf.cell(0, 8, "四、改进建议", 0, 1)
+        pdf.cell(0, 8, "4. Improvement Suggestions", 0, 1)
         pdf.set_font_size(10)
-        
-        for alert in alerts[:6]:
+        for alert in alerts[:5]:
             pdf.cell(5, 6, "-", 0, 0)
-            short_alert = alert[:120] if len(alert) > 120 else alert
+            short_alert = alert[:100] if len(alert) > 100 else alert
             pdf.cell(0, 6, f" {short_alert}", 0, 1)
         pdf.ln(3)
     
-    # ========== 五、评价结论 ==========
+    # 结论
     pdf.set_font_size(14)
-    pdf.cell(0, 8, "五、评价结论", 0, 1)
+    pdf.cell(0, 8, "5. Conclusion", 0, 1)
     pdf.set_font_size(11)
     
     if total_score >= 0.8:
         pdf.set_text_color(0, 150, 0)
-        conclusion = "方案质量优秀，各项指标表现良好，建议优先考虑。"
+        conclusion = "Excellent: The solution meets all criteria, highly recommended."
     elif total_score >= 0.6:
         pdf.set_text_color(200, 150, 0)
-        conclusion = "方案质量良好，部分维度有提升空间，建议优化后采用。"
+        conclusion = "Good: The solution is acceptable with minor improvements needed."
     elif total_score >= 0.4:
         pdf.set_text_color(200, 100, 0)
-        conclusion = "方案质量一般，存在较多不足，建议重大修改后重新评审。"
+        conclusion = "Fair: The solution has significant gaps, major revision recommended."
     else:
         pdf.set_text_color(200, 0, 0)
-        conclusion = "方案质量较差，不建议采用。"
+        conclusion = "Poor: The solution does not meet requirements, not recommended."
     
     pdf.cell(0, 8, conclusion, 0, 1)
     
     # 保存
     pdf.output(filename)
-    print(f"PDF已保存: {filename}")
     return filename
