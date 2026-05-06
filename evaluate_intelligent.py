@@ -4,6 +4,9 @@ import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
+# ========== NLP 语义理解模块 ==========
+from nlp_semantic import batch_semantic_scores, SemanticAnalyzer, DIMENSION_DESCRIPTIONS
+
 # ========== 语义组配置 ==========
 SEMANTIC_GROUPS = {
     "云计算技术": ["云计算", "云平台", "云服务", "弹性计算", "容器化", "云原生", "上云", "用云"],
@@ -98,7 +101,7 @@ def evaluate_tech_advanced_with_details(text):
     
     return best_score, detail
 
-# ========== 2. 语义相似度 ==========
+# ========== 2. 语义相似度（TF-IDF备用） ==========
 def load_sample_texts(sample_dir="优秀范文"):
     samples = []
     if not os.path.exists(sample_dir):
@@ -288,10 +291,11 @@ def detect_risks(text, project_type, project_scale, user_security_level, extract
     
     return risks
 
-# ========== 8. 综合评价 ==========
+# ========== 8. 综合评价（集成 NLP 语义理解） ==========
 def evaluate_intelligent(text, project_type, user_security_level, project_scale="中型", budget_limit=None):
     extracted_budget = extract_budget(text)
     
+    # ========== 规则得分 ==========
     tech_score, tech_detail = evaluate_tech_advanced_with_details(text)
     richness_score, richness_detail = evaluate_richness_with_details(text)
     budget_score, budget_detail = evaluate_budget_with_details(text, project_type, extracted_budget, budget_limit, project_scale)
@@ -309,6 +313,26 @@ def evaluate_intelligent(text, project_type, user_security_level, project_scale=
         "项目可行性": {"得分": feasibility_score, "说明": feasibility_detail},
     }
     
+    # ========== NLP 语义理解得分（增强智能化） ==========
+    try:
+        analyzer = SemanticAnalyzer()
+        semantic_scores = batch_semantic_scores(text, analyzer)
+        
+        # 融合规则得分和语义得分（规则 60%，语义 40%）
+        for indicator in scores.keys():
+            if indicator in semantic_scores:
+                rule_score = scores[indicator]["得分"]
+                sem_score = semantic_scores[indicator]
+                fused_score = 0.6 * rule_score + 0.4 * sem_score
+                scores[indicator] = {
+                    "得分": fused_score,
+                    "说明": f"{scores[indicator]['说明']}；语义相似度：{sem_score:.2f}"
+                }
+    except Exception as e:
+        print(f"语义评分失败: {e}")
+        # 如果语义模型失败，保持原有得分，不影响系统运行
+    
+    # ========== 权重配置 ==========
     weights = {
         "技术先进性": 0.20,
         "内容丰富度": 0.15,
@@ -336,6 +360,7 @@ def evaluate_intelligent(text, project_type, user_security_level, project_scale=
         elif score >= 0.8:
             alerts.append(f"✅ {indicator}表现优秀（{score:.2f}）")
     
+    # 缺失关键词收集
     tech_missing = []
     for category, keywords in TECH_CATEGORIES.items():
         for kw in keywords:
