@@ -10,7 +10,7 @@ from evaluate_intelligent import evaluate_intelligent, extract_budget, infer_sec
 from db_manager import init_db, save_evaluation, get_history, get_all_project_names, get_iteration_history
 from report_generator import generate_evaluation_report
 
-st.set_page_config(page_title="智评系统", page_icon="🏛️", layout="wide")
+st.set_page_config(page_title="政府信息化项目方案辅助评审系统", page_icon="🏛️", layout="wide")
 
 # ========== CSS样式 ==========
 st.markdown("""
@@ -137,7 +137,7 @@ def get_score_color(s):
 
 # ========== 侧边栏 ==========
 with st.sidebar:
-    st.markdown("### 🏛️ 政府信息化项目智能评价系统")
+    st.markdown("### 🏛️ 政府信息化项目方案辅助评审系统")
     st.markdown("---")
     
     project_name = st.text_input("项目名称", placeholder="可选")
@@ -224,10 +224,47 @@ if run and uploaded_files:
 if st.session_state.evaluation_done and st.session_state.current_results:
     results = st.session_state.current_results
     pname = st.session_state.current_project_name
+    is_multi = len(results) > 1
     
     st.markdown(f"<h2>📊 {pname}</h2>", unsafe_allow_html=True)
     st.caption(f"评价时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     
+    # ===== 多方案对比模式 =====
+    if is_multi:
+        st.subheader("📈 多方案横向对比")
+        compare_df = pd.DataFrame([
+            {
+                "方案名称": r["filename"][:30],
+                "总分": f"{r['total']:.2f}",
+                "技术先进性": f"{r['scores']['技术先进性']['得分']:.2f}",
+                "内容丰富度": f"{r['scores']['内容丰富度']['得分']:.2f}",
+                "预算合理性": f"{r['scores']['预算合理性']['得分']:.2f}",
+                "安全可靠性": f"{r['scores']['安全可靠性']['得分']:.2f}",
+                "风险数": len(r["risks"]),
+            }
+            for r in results
+        ]).sort_values("总分", ascending=False)
+        st.dataframe(compare_df, use_container_width=True, hide_index=True)
+        
+        # 对比雷达图
+        fig = px.line_polar()
+        for r in results:
+            fig.add_scatterpolar(
+                r=[r["scores"][d]["得分"] for d in ["技术先进性", "内容丰富度", "预算合理性", "安全可靠性", "项目可行性"]],
+                theta=["技术先进性", "内容丰富度", "预算合理性", "安全可靠性", "项目可行性"],
+                name=r["filename"][:15],
+                line=dict(shape='linear')
+            )
+        fig.update_layout(
+            polar=dict(radialaxis=dict(range=[0, 1])),
+            height=500
+        )
+        st.plotly_chart(fig, use_container_width=True)
+        
+        best = max(results, key=lambda x: x["total"])
+        st.success(f"🏆 **推荐方案**：{best['filename']}（总分 {best['total']:.2f}）")
+    
+    # ===== 单方案/多方案详情（使用标签页）=====
     if len(results) > 1:
         tabs = st.tabs([f"📄 {r['filename'][:20]}" for r in results])
     else:
@@ -324,7 +361,7 @@ if st.session_state.evaluation_done and st.session_state.current_results:
                     key=f"export_{idx}"
                 )
     
-    # 版本对比
+    # ===== 版本对比 =====
     if st.session_state.compare_mode and st.session_state.result_v2:
         st.markdown("---")
         st.header("📊 版本对比分析")
@@ -378,7 +415,6 @@ if iteration_mode and iteration_name:
 with st.expander("📜 历史评价记录"):
     st.markdown("""
     <style>
-    /* 下拉框主体 */
     .stExpander [data-baseweb="select"] {
         background-color: #e6f3ff !important;
     }
@@ -386,7 +422,6 @@ with st.expander("📜 历史评价记录"):
         background-color: #e6f3ff !important;
         border: 1px solid #b0d4f0 !important;
     }
-    /* 全局选项面板 - 使用最高优先级 */
     [role="listbox"] {
         background-color: #e6f3ff !important;
         border: 1px solid #b0d4f0 !important;
@@ -398,7 +433,6 @@ with st.expander("📜 历史评价记录"):
     [role="option"]:hover {
         background-color: #d4e8ff !important;
     }
-    /* 下拉框图标 */
     .stExpander svg {
         fill: #000000 !important;
         stroke: #000000 !important;
